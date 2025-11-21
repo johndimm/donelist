@@ -178,19 +178,25 @@ export default function DayEdit({ date }: DayEditProps) {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
 
-    const updatedCategory: Category = {
-      ...category,
-      valueShortNames: {
-        ...category.valueShortNames,
-        [value]: shortName.trim() || undefined,
-      },
+    const trimmedShortName = shortName.trim();
+    
+    // Build valueShortNames object, only including the new value if it's not empty
+    let newValueShortNames: Record<string, string> = {
+      ...category.valueShortNames,
     };
 
-    // Remove the key if shortName is empty
-    if (!shortName.trim() && updatedCategory.valueShortNames) {
-      const { [value]: _, ...rest } = updatedCategory.valueShortNames;
-      updatedCategory.valueShortNames = Object.keys(rest).length > 0 ? rest : undefined;
+    if (trimmedShortName) {
+      newValueShortNames[value] = trimmedShortName;
+    } else {
+      // Remove the key if shortName is empty
+      const { [value]: _, ...rest } = newValueShortNames;
+      newValueShortNames = rest;
     }
+
+    const updatedCategory: Category = {
+      ...category,
+      valueShortNames: Object.keys(newValueShortNames).length > 0 ? newValueShortNames : undefined,
+    };
 
     saveCategory(updatedCategory);
     loadData();
