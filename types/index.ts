@@ -6,6 +6,7 @@ export interface Category {
   valueShortNames?: Record<string, string>; // Maps full value name to short name
   trackTime?: boolean; // If true, allows recording start time for this category
   isCounter?: boolean; // If true, this category is a counter field
+  visible?: boolean; // If false, hides the category in edit view (defaults to true)
 }
 
 export interface SelectionWithTime {

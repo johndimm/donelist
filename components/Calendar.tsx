@@ -137,6 +137,9 @@ export default function Calendar() {
       const category = categories.find(c => c.id === categoryId);
       if (!category) return;
       
+      // Skip categories that are marked as not visible
+      if (category.visible === false) return;
+      
       // Handle counter categories
       if (category.isCounter) {
         const counterValue = getCounterValue(selection);

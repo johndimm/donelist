@@ -16,9 +16,10 @@ import CategoryManager from './CategoryManager';
 
 interface DayEditProps {
   date: string;
+  onClose?: () => void;
 }
 
-export default function DayEdit({ date }: DayEditProps) {
+export default function DayEdit({ date, onClose }: DayEditProps) {
   const [mounted, setMounted] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [entry, setEntry] = useState<DayEntry | null>(null);
@@ -258,6 +259,19 @@ export default function DayEdit({ date }: DayEditProps) {
     loadData();
   }
 
+  function handleToggleVisible(categoryId: string) {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const updatedCategory: Category = {
+      ...category,
+      visible: category.visible === false ? true : false,
+    };
+
+    saveCategory(updatedCategory);
+    loadData();
+  }
+
   function handleCounterIncrement(categoryId: string) {
     if (!entry) return;
     
@@ -332,7 +346,7 @@ export default function DayEdit({ date }: DayEditProps) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
           {dateDisplay}
         </h2>
@@ -371,6 +385,22 @@ export default function DayEdit({ date }: DayEditProps) {
             >
               <Plus size={14} />
               New
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                padding: '0.375rem 0.75rem',
+                backgroundColor: 'white',
+                color: '#333',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Close
             </button>
           )}
         </div>
@@ -474,8 +504,8 @@ export default function DayEdit({ date }: DayEditProps) {
         </div>
       )}
 
-      <div style={{ marginBottom: '0.75rem' }}>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.25rem', color: '#666' }}>
+      <div style={{ marginBottom: '0.5rem' }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.15rem', color: '#666' }}>
           Notes:
         </label>
         <textarea
@@ -580,8 +610,17 @@ export default function DayEdit({ date }: DayEditProps) {
                       {category.name}
                     </h3>
                   )}
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#666', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#666', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={category.visible !== false}
+                        onChange={() => handleToggleVisible(category.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      visible
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#666', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       <input
                         type="checkbox"
                         checked={category.trackTime || false}
@@ -590,7 +629,7 @@ export default function DayEdit({ date }: DayEditProps) {
                       />
                       time
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#666', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#666', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       <input
                         type="checkbox"
                         checked={category.isCounter || false}
@@ -679,90 +718,103 @@ export default function DayEdit({ date }: DayEditProps) {
                       return (
                         <div
                           key={value}
-                          onClick={(e) => {
-                            // Don't trigger if clicking on inputs or buttons
-                            if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'BUTTON') {
-                              return;
-                            }
-                            if (isSelected) {
-                              handleSelectionChange(category.id, '');
-                            } else {
-                              handleSelectionChange(category.id, value);
-                            }
-                          }}
                           style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            padding: '0.4rem',
+                            flexDirection: 'column',
+                            gap: '0.3rem',
+                            padding: '0.5rem',
                             backgroundColor: isSelected ? '#e3f2fd' : 'white',
                             border: isSelected ? '1px solid #0070f3' : '1px solid #ddd',
                             borderRadius: '4px',
                             fontSize: '0.8rem',
-                            cursor: 'pointer',
                           }}
                         >
-                          <input
-                            type="radio"
-                            name={category.id}
-                            value={value}
-                            checked={isSelected}
-                            onChange={() => handleSelectionChange(category.id, isSelected ? '' : value)}
+                          <div
                             onClick={(e) => {
-                              // Prevent double-triggering when clicking the radio button itself
+                              // Don't trigger if clicking on inputs or buttons
+                              if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'BUTTON') {
+                                return;
+                              }
                               if (isSelected) {
-                                e.preventDefault();
                                 handleSelectionChange(category.id, '');
+                              } else {
+                                handleSelectionChange(category.id, value);
                               }
                             }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          <span style={{ fontWeight: '500', flex: 1, fontSize: '0.8rem' }}>{value}</span>
-                          <input
-                            type="text"
-                            value={shortName}
-                            onChange={(e) => handleSetShortName(category.id, value, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            placeholder="short"
                             style={{
-                              padding: '0.2rem 0.4rem',
-                              border: '1px solid #ddd',
-                              borderRadius: '3px',
-                              fontSize: '0.75rem',
-                              width: '70px',
-                            }}
-                          />
-                          {isSelected && category.trackTime && (
-                            <input
-                              type="time"
-                              value={selectedTime}
-                              onChange={(e) => handleTimeChange(category.id, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                padding: '0.3rem',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                backgroundColor: 'white',
-                                width: '90px',
-                              }}
-                            />
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteValue(category.id, value);
-                            }}
-                            style={{
-                              padding: '0.2rem',
-                              color: '#999',
                               display: 'flex',
                               alignItems: 'center',
+                              gap: '0.5rem',
+                              cursor: 'pointer',
                             }}
-                            title="Delete value"
                           >
-                            <X size={12} />
-                          </button>
+                            <input
+                              type="radio"
+                              name={category.id}
+                              value={value}
+                              checked={isSelected}
+                              onChange={() => handleSelectionChange(category.id, isSelected ? '' : value)}
+                              onClick={(e) => {
+                                if (isSelected) {
+                                  e.preventDefault();
+                                  handleSelectionChange(category.id, '');
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontWeight: '500', flex: 1, fontSize: '0.85rem' }}>{value}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteValue(category.id, value);
+                              }}
+                              style={{
+                                padding: '0.2rem',
+                                color: '#999',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                              }}
+                              title="Delete value"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '1.5rem' }}>
+                            <input
+                              type="text"
+                              value={shortName}
+                              onChange={(e) => handleSetShortName(category.id, value, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Short name"
+                              style={{
+                                padding: '0.3rem 0.5rem',
+                                border: '1px solid #ddd',
+                                borderRadius: '3px',
+                                fontSize: '0.75rem',
+                                flex: 1,
+                                maxWidth: '120px',
+                              }}
+                            />
+                            {isSelected && category.trackTime && (
+                              <input
+                                type="time"
+                                value={selectedTime}
+                                onChange={(e) => handleTimeChange(category.id, e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  padding: '0.3rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  fontSize: '0.8rem',
+                                  backgroundColor: 'white',
+                                  width: '100px',
+                                }}
+                              />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
