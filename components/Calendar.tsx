@@ -16,6 +16,29 @@ export default function Calendar() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [highlightFilter, setHighlightFilter] = useState<{ categoryId: string; value: string | number } | null>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [columnsPerRow, setColumnsPerRow] = useState(7);
+
+  useEffect(() => {
+    const checkWidth = () => {
+      const width = window.innerWidth;
+      setIsNarrow(width < 900);
+      
+      // Calculate how many columns can fit: (width - padding - gaps) / (minDayWidth + gap)
+      // Account for main padding (2rem = 32px on each side = 64px total, or 0.5rem = 8px on narrow)
+      const mainPadding = width < 900 ? 16 : 64;
+      const gap = width < 900 ? 8 : 16; // gap in pixels
+      const minDayWidth = 140; // minimum day width in pixels
+      const availableWidth = width - mainPadding;
+      // Calculate: (availableWidth + gap) / (minDayWidth + gap)
+      const calculatedColumns = Math.floor((availableWidth + gap) / (minDayWidth + gap));
+      // Cap at 7 and ensure at least 1
+      setColumnsPerRow(Math.max(1, Math.min(7, calculatedColumns)));
+    };
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -232,20 +255,20 @@ export default function Calendar() {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: '1.5rem',
+        marginBottom: isNarrow ? '0.75rem' : '1.5rem',
         flexWrap: 'wrap',
-        gap: '1rem'
+        gap: isNarrow ? '0.5rem' : '1rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {!todayVisible && (
             <button
               onClick={goToToday}
               style={{
-                padding: '0.5rem 1rem',
+                padding: isNarrow ? '0.35rem 0.6rem' : '0.5rem 1rem',
                 borderRadius: '6px',
                 backgroundColor: 'white',
                 border: '1px solid #ddd',
-                fontSize: '0.9rem',
+                fontSize: isNarrow ? '0.75rem' : '0.9rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
@@ -262,7 +285,7 @@ export default function Calendar() {
           <button
             onClick={() => viewMode === 'week' ? navigateWeek(-1) : navigateMonth(-1)}
             style={{
-              padding: '0.5rem',
+              padding: isNarrow ? '0.25rem' : '0.5rem',
               borderRadius: '6px',
               backgroundColor: 'white',
               border: '1px solid #ddd',
@@ -271,8 +294,8 @@ export default function Calendar() {
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              width: '36px',
-              height: '36px',
+              width: isNarrow ? '28px' : '36px',
+              height: isNarrow ? '28px' : '36px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f5f5f5';
@@ -281,9 +304,9 @@ export default function Calendar() {
               e.currentTarget.style.backgroundColor = 'white';
             }}
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={isNarrow ? 16 : 20} />
           </button>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', minWidth: '200px', margin: 0 }}>
+          <h2 style={{ fontSize: isNarrow ? '1rem' : '1.5rem', fontWeight: '600', minWidth: isNarrow ? '120px' : '200px', margin: 0 }}>
             {viewMode === 'week' 
               ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[13].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
               : monthName}
@@ -291,7 +314,7 @@ export default function Calendar() {
           <button
             onClick={() => viewMode === 'week' ? navigateWeek(1) : navigateMonth(1)}
             style={{
-              padding: '0.5rem',
+              padding: isNarrow ? '0.25rem' : '0.5rem',
               borderRadius: '6px',
               backgroundColor: 'white',
               border: '1px solid #ddd',
@@ -300,8 +323,8 @@ export default function Calendar() {
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              width: '36px',
-              height: '36px',
+              width: isNarrow ? '28px' : '36px',
+              height: isNarrow ? '28px' : '36px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f5f5f5';
@@ -310,51 +333,52 @@ export default function Calendar() {
               e.currentTarget.style.backgroundColor = 'white';
             }}
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={isNarrow ? 16 : 20} />
           </button>
         </div>
-        <button
-          onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
-          style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            backgroundColor: viewMode === 'week' ? '#0070f3' : 'white',
-            color: viewMode === 'week' ? 'white' : '#333',
-            border: '1px solid #ddd',
-            fontSize: '0.9rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            height: '36px',
-          }}
-          onMouseEnter={(e) => {
-            if (viewMode === 'week') {
-              e.currentTarget.style.backgroundColor = '#0051cc';
-            } else {
-              e.currentTarget.style.backgroundColor = '#f5f5f5';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (viewMode === 'week') {
-              e.currentTarget.style.backgroundColor = '#0070f3';
-            } else {
-              e.currentTarget.style.backgroundColor = 'white';
-            }
-          }}
-        >
-          <CalendarIcon size={16} />
-          {viewMode === 'week' ? 'Month View' : 'Week View'}
-        </button>
+        {columnsPerRow >= 7 && (
+          <button
+            onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
+            style={{
+              padding: isNarrow ? '0.35rem 0.6rem' : '0.5rem 1rem',
+              borderRadius: '6px',
+              backgroundColor: viewMode === 'week' ? '#0070f3' : 'white',
+              color: viewMode === 'week' ? 'white' : '#333',
+              border: '1px solid #ddd',
+              fontSize: isNarrow ? '0.75rem' : '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: isNarrow ? '0.25rem' : '0.5rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              height: isNarrow ? '28px' : '36px',
+            }}
+            onMouseEnter={(e) => {
+              if (viewMode === 'week') {
+                e.currentTarget.style.backgroundColor = '#0051cc';
+              } else {
+                e.currentTarget.style.backgroundColor = '#f5f5f5';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (viewMode === 'week') {
+                e.currentTarget.style.backgroundColor = '#0070f3';
+              } else {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <CalendarIcon size={isNarrow ? 14 : 16} />
+            {!isNarrow && (viewMode === 'week' ? 'Month View' : 'Week View')}
+          </button>
+        )}
       </div>
 
       {viewMode === 'week' ? (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gridTemplateRows: 'repeat(2, 1fr)',
-          gap: '1rem',
+          gridTemplateColumns: `repeat(${columnsPerRow}, 1fr)`,
+          gap: isNarrow ? '0.5rem' : '1rem',
         }}>
           {weekDates.map((date, idx) => {
             const dateStr = formatDate(date);
@@ -369,11 +393,12 @@ export default function Calendar() {
                 onClick={() => handleDayClick(date)}
                 style={{
                   backgroundColor: isHighlighted ? '#fff3cd' : 'white',
-                  borderRadius: '8px',
-                  padding: '1rem',
+                  borderRadius: isNarrow ? '4px' : '8px',
+                  padding: isNarrow ? '0.5rem' : '1rem',
                   border: isToday ? '2px solid #0070f3' : isHighlighted ? '2px solid #ffc107' : '1px solid #ddd',
                   cursor: 'pointer',
-                  minHeight: '150px',
+                  minWidth: '140px',
+                  maxWidth: '100%',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                 }}
                 onMouseEnter={(e) => {
@@ -387,12 +412,13 @@ export default function Calendar() {
               >
                 <div style={{ 
                   fontWeight: '600', 
-                  marginBottom: '0.5rem',
+                  marginBottom: isNarrow ? '0.4rem' : '0.5rem',
+                  fontSize: isNarrow ? '0.8rem' : '0.9rem',
                   color: isToday ? '#0070f3' : '#333',
                 }}>
                   {date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                <div style={{ fontSize: isNarrow ? '0.75rem' : '0.85rem', color: '#666' }}>
                   {selections.length > 0 && (
                     <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                       {selections.map((sel, i) => {
@@ -411,13 +437,14 @@ export default function Calendar() {
                             key={i} 
                             onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                             style={{ 
-                              marginBottom: '0.25rem',
+                              marginBottom: isNarrow ? '0.2rem' : '0.25rem',
                               cursor: 'pointer',
-                              padding: '0.125rem 0.25rem',
+                              padding: isNarrow ? '0.1rem 0.2rem' : '0.125rem 0.25rem',
                               borderRadius: '3px',
                               backgroundColor: isSelected ? '#ffc107' : 'transparent',
                               fontWeight: isSelected ? '600' : 'normal',
                               transition: 'background-color 0.2s',
+                              wordBreak: 'break-word',
                             }}
                             onMouseEnter={(e) => {
                               if (!isSelected) {
@@ -438,10 +465,10 @@ export default function Calendar() {
                   )}
                   {notes && (
                     <div style={{
-                      marginTop: selections.length > 0 ? '0.5rem' : 0,
-                      paddingTop: selections.length > 0 ? '0.5rem' : 0,
+                      marginTop: selections.length > 0 ? (isNarrow ? '0.4rem' : '0.5rem') : 0,
+                      paddingTop: selections.length > 0 ? (isNarrow ? '0.4rem' : '0.5rem') : 0,
                       borderTop: selections.length > 0 ? '1px solid #e0e0e0' : 'none',
-                      fontSize: '0.8rem',
+                      fontSize: isNarrow ? '0.7rem' : '0.8rem',
                       fontStyle: 'italic',
                       color: '#555',
                       whiteSpace: 'pre-wrap',
@@ -458,27 +485,41 @@ export default function Calendar() {
       ) : (
         <div>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '0.5rem',
-            marginBottom: '0.5rem',
+            overflowX: isNarrow ? 'auto' : 'visible',
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            marginBottom: isNarrow ? '0.25rem' : '0.5rem',
           }}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} style={{
-                textAlign: 'center',
-                fontWeight: '600',
-                padding: '0.5rem',
-                color: '#666',
-              }}>
-                {day}
-              </div>
-            ))}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isNarrow ? 'repeat(7, 120px)' : 'repeat(7, 1fr)',
+              gap: isNarrow ? '0.25rem' : '0.5rem',
+              minWidth: isNarrow ? 'max-content' : 'auto',
+            }}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} style={{
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  padding: isNarrow ? '0.25rem' : '0.5rem',
+                  fontSize: isNarrow ? '0.7rem' : '0.9rem',
+                  color: '#666',
+                }}>
+                  {day}
+                </div>
+              ))}
+            </div>
           </div>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '0.5rem',
+            overflowX: isNarrow ? 'auto' : 'visible',
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
           }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isNarrow ? 'repeat(7, 120px)' : 'repeat(7, 1fr)',
+              gap: isNarrow ? '0.25rem' : '0.5rem',
+              minWidth: isNarrow ? 'max-content' : 'auto',
+            }}>
             {monthDates.map((date, idx) => {
               const dateStr = formatDate(date);
               const isToday = dateStr === formatDate(new Date());
@@ -493,11 +534,13 @@ export default function Calendar() {
                   onClick={() => handleDayClick(date)}
                   style={{
                     backgroundColor: isCurrentMonth ? (isHighlighted ? '#fff3cd' : 'white') : '#f9f9f9',
-                    borderRadius: '6px',
-                    padding: '0.75rem',
+                    borderRadius: isNarrow ? '4px' : '6px',
+                    padding: isNarrow ? '0.4rem' : '0.75rem',
                     border: isToday ? '2px solid #0070f3' : isHighlighted ? '2px solid #ffc107' : '1px solid #ddd',
                     cursor: 'pointer',
-                    minHeight: '150px',
+                    minHeight: isNarrow ? '100px' : '150px',
+                    minWidth: isNarrow ? '120px' : 'auto',
+                    width: isNarrow ? '120px' : 'auto',
                     opacity: isCurrentMonth ? 1 : 0.5,
                     transition: 'transform 0.2s, box-shadow 0.2s',
                   }}
@@ -514,12 +557,13 @@ export default function Calendar() {
                 >
                   <div style={{
                     fontWeight: isToday ? '600' : '400',
-                    marginBottom: '0.5rem',
+                    marginBottom: isNarrow ? '0.25rem' : '0.5rem',
+                    fontSize: isNarrow ? '0.7rem' : '0.9rem',
                     color: isToday ? '#0070f3' : '#333',
                   }}>
                     {date.getDate()}
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  <div style={{ fontSize: isNarrow ? '0.7rem' : '0.85rem', color: '#666' }}>
                     {selections.length > 0 && (
                       <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                         {selections.map((sel, i) => {
@@ -538,9 +582,9 @@ export default function Calendar() {
                               key={i} 
                               onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                               style={{ 
-                                marginBottom: '0.25rem',
+                                marginBottom: isNarrow ? '0.1rem' : '0.25rem',
                                 cursor: 'pointer',
-                                padding: '0.125rem 0.25rem',
+                                padding: isNarrow ? '0.05rem 0.15rem' : '0.125rem 0.25rem',
                                 borderRadius: '3px',
                                 backgroundColor: isSelected ? '#ffc107' : 'transparent',
                                 fontWeight: isSelected ? '600' : 'normal',
@@ -565,10 +609,10 @@ export default function Calendar() {
                     )}
                     {notes && (
                       <div style={{
-                        marginTop: selections.length > 0 ? '0.5rem' : 0,
-                        paddingTop: selections.length > 0 ? '0.5rem' : 0,
+                        marginTop: selections.length > 0 ? (isNarrow ? '0.25rem' : '0.5rem') : 0,
+                        paddingTop: selections.length > 0 ? (isNarrow ? '0.25rem' : '0.5rem') : 0,
                         borderTop: selections.length > 0 ? '1px solid #e0e0e0' : 'none',
-                        fontSize: '0.8rem',
+                        fontSize: isNarrow ? '0.65rem' : '0.8rem',
                         fontStyle: 'italic',
                         color: '#555',
                         whiteSpace: 'pre-wrap',
@@ -581,6 +625,7 @@ export default function Calendar() {
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       )}

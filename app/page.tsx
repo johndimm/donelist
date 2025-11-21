@@ -11,9 +11,16 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const checkWidth = () => {
+      setIsNarrow(window.innerWidth < 900);
+    };
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
   }, []);
 
   function handleExport() {
@@ -78,24 +85,24 @@ export default function Home() {
   }
 
   return (
-    <main style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+    <main style={{ padding: isNarrow ? '0.5rem' : '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isNarrow ? '0.75rem' : '2rem', flexWrap: 'wrap', gap: isNarrow ? '0.5rem' : '1rem' }}>
+        <h1 style={{ fontSize: isNarrow ? '1.25rem' : '2rem', fontWeight: 'bold', margin: 0 }}>
           Done List
         </h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
             onClick={handleExport}
             style={{
-              padding: '0.5rem 1rem',
+              padding: isNarrow ? '0.35rem 0.6rem' : '0.5rem 1rem',
               backgroundColor: '#0070f3',
               color: 'white',
               border: '1px solid #0070f3',
               borderRadius: '6px',
-              fontSize: '0.9rem',
+              fontSize: isNarrow ? '0.75rem' : '0.9rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: isNarrow ? '0.25rem' : '0.5rem',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
             }}
@@ -106,21 +113,21 @@ export default function Home() {
               e.currentTarget.style.backgroundColor = '#0070f3';
             }}
           >
-            <Download size={16} />
-            Export
+            <Download size={isNarrow ? 14 : 16} />
+            {!isNarrow && 'Export'}
           </button>
           <button
             onClick={handleImportClick}
             style={{
-              padding: '0.5rem 1rem',
+              padding: isNarrow ? '0.35rem 0.6rem' : '0.5rem 1rem',
               backgroundColor: 'white',
               color: '#333',
               border: '1px solid #ddd',
               borderRadius: '6px',
-              fontSize: '0.9rem',
+              fontSize: isNarrow ? '0.75rem' : '0.9rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: isNarrow ? '0.25rem' : '0.5rem',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
             }}
@@ -131,8 +138,8 @@ export default function Home() {
               e.currentTarget.style.backgroundColor = 'white';
             }}
           >
-            <Upload size={16} />
-            Import
+            <Upload size={isNarrow ? 14 : 16} />
+            {!isNarrow && 'Import'}
           </button>
           <input
             ref={fileInputRef}
@@ -146,13 +153,13 @@ export default function Home() {
       {importMessage && (
         <div
           style={{
-            padding: '0.75rem 1rem',
-            marginBottom: '1rem',
+            padding: isNarrow ? '0.5rem 0.75rem' : '0.75rem 1rem',
+            marginBottom: isNarrow ? '0.5rem' : '1rem',
             borderRadius: '6px',
             backgroundColor: importMessage.type === 'success' ? '#d4edda' : '#f8d7da',
             color: importMessage.type === 'success' ? '#155724' : '#721c24',
             border: `1px solid ${importMessage.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
-            fontSize: '0.9rem',
+            fontSize: isNarrow ? '0.75rem' : '0.9rem',
           }}
         >
           {importMessage.text}
