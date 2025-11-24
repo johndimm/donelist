@@ -15,7 +15,7 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<DayEntry[]>([]);
-  const [highlightFilter, setHighlightFilter] = useState<{ categoryId?: string; value?: string | number; filterBy: 'category' | 'value' | 'both' } | null>(null);
+  const [highlightFilter, setHighlightFilter] = useState<{ categoryId: string; value: string | number } | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [columnsPerRow, setColumnsPerRow] = useState(7);
 
@@ -28,14 +28,12 @@ export default function Calendar() {
       // Account for main padding (2rem = 32px on each side = 64px total, or 0.5rem = 8px on narrow)
       const mainPadding = width < 900 ? 16 : 64;
       const gap = width < 900 ? 8 : 16; // gap in pixels
-      const minDayWidth = width >= 1400 ? 180 : (width >= 1200 ? 160 : 140); // minimum day width in pixels, larger on wider screens
+      const minDayWidth = 140; // minimum day width in pixels
       const availableWidth = width - mainPadding;
       // Calculate: (availableWidth + gap) / (minDayWidth + gap)
       const calculatedColumns = Math.floor((availableWidth + gap) / (minDayWidth + gap));
       // Cap at 7 and ensure at least 1
-      // If we can fit 7 columns, always use 7 to maximize horizontal space
-      const finalColumns = calculatedColumns >= 7 ? 7 : Math.max(1, calculatedColumns);
-      setColumnsPerRow(finalColumns);
+      setColumnsPerRow(Math.max(1, Math.min(7, calculatedColumns)));
     };
     checkWidth();
     window.addEventListener('resize', checkWidth);
@@ -139,9 +137,6 @@ export default function Calendar() {
       const category = categories.find(c => c.id === categoryId);
       if (!category) return;
       
-      // Skip categories that are marked as not visible
-      if (category.visible === false) return;
-      
       // Handle counter categories
       if (category.isCounter) {
         const counterValue = getCounterValue(selection);
@@ -177,66 +172,24 @@ export default function Calendar() {
     const entry = entries.find(e => e.date === dateStr);
     if (!entry) return false;
     
-    // Filter by category only
-    if (highlightFilter.filterBy === 'category' && highlightFilter.categoryId) {
-      return entry.selections.hasOwnProperty(highlightFilter.categoryId);
-    }
+    const selection = entry.selections[highlightFilter.categoryId];
+    if (!selection) return false;
     
-    // Filter by value only (across all categories)
-    if (highlightFilter.filterBy === 'value' && highlightFilter.value !== undefined) {
-      return Object.values(entry.selections).some(selection => {
-        if (typeof highlightFilter.value === 'number') {
-          return typeof selection === 'number' && selection === highlightFilter.value;
-        } else {
-          const value = getSelectionValue(selection);
-          return value === highlightFilter.value;
-        }
-      });
-    }
-    
-    // Filter by both (original behavior)
-    if (highlightFilter.filterBy === 'both' && highlightFilter.categoryId && highlightFilter.value !== undefined) {
-      const selection = entry.selections[highlightFilter.categoryId];
-      if (!selection) return false;
-      
-      if (typeof highlightFilter.value === 'number') {
-        return typeof selection === 'number' && selection === highlightFilter.value;
-      } else {
-        const value = getSelectionValue(selection);
-        return value === highlightFilter.value;
-      }
-    }
-    
-    return false;
-  }
-
-  function handleCategoryClick(e: React.MouseEvent, categoryId: string) {
-    e.stopPropagation(); // Prevent day click
-    if (highlightFilter?.filterBy === 'category' && highlightFilter.categoryId === categoryId) {
-      // Clicking the same category again clears the highlight
-      setHighlightFilter(null);
+    if (typeof highlightFilter.value === 'number') {
+      return typeof selection === 'number' && selection === highlightFilter.value;
     } else {
-      setHighlightFilter({ categoryId, filterBy: 'category' });
-    }
-  }
-
-  function handleValueClick(e: React.MouseEvent, value: string | number) {
-    e.stopPropagation(); // Prevent day click
-    if (highlightFilter?.filterBy === 'value' && highlightFilter.value === value) {
-      // Clicking the same value again clears the highlight
-      setHighlightFilter(null);
-    } else {
-      setHighlightFilter({ value, filterBy: 'value' });
+      const value = getSelectionValue(selection);
+      return value === highlightFilter.value;
     }
   }
 
   function handleSelectionClick(e: React.MouseEvent, categoryId: string, value: string | number) {
     e.stopPropagation(); // Prevent day click
-    if (highlightFilter?.filterBy === 'both' && highlightFilter.categoryId === categoryId && highlightFilter.value === value) {
+    if (highlightFilter && highlightFilter.categoryId === categoryId && highlightFilter.value === value) {
       // Clicking the same selection again clears the highlight
       setHighlightFilter(null);
     } else {
-      setHighlightFilter({ categoryId, value, filterBy: 'both' });
+      setHighlightFilter({ categoryId, value });
     }
   }
 
@@ -424,9 +377,8 @@ export default function Calendar() {
       {viewMode === 'week' ? (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: columnsPerRow === 7 ? 'repeat(7, 1fr)' : `repeat(${columnsPerRow}, 1fr)`,
+          gridTemplateColumns: `repeat(${columnsPerRow}, 1fr)`,
           gap: isNarrow ? '0.5rem' : '1rem',
-          width: '100%',
         }}>
           {weekDates.map((date, idx) => {
             const dateStr = formatDate(date);
@@ -445,7 +397,7 @@ export default function Calendar() {
                   padding: isNarrow ? '0.5rem' : '1rem',
                   border: isToday ? '2px solid #0070f3' : isHighlighted ? '2px solid #ffc107' : '1px solid #ddd',
                   cursor: 'pointer',
-                  minWidth: columnsPerRow === 7 ? 'auto' : '140px',
+                  minWidth: '140px',
                   maxWidth: '100%',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                 }}
@@ -470,10 +422,7 @@ export default function Calendar() {
                   {selections.length > 0 && (
                     <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                       {selections.map((sel, i) => {
-                        const isCategorySelected = highlightFilter?.filterBy === 'category' && highlightFilter?.categoryId === sel.categoryId;
-                        const isValueSelected = highlightFilter?.filterBy === 'value' && highlightFilter?.value === sel.value;
-                        const isBothSelected = highlightFilter?.filterBy === 'both' && highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
-                        const isSelected = isCategorySelected || isValueSelected || isBothSelected;
+                        const isSelected = highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
                         const category = categories.find(c => c.id === sel.categoryId);
                         const entry = entries.find(e => e.date === dateStr);
                         const displayValue = category?.isCounter 
@@ -486,35 +435,29 @@ export default function Calendar() {
                         return (
                           <li 
                             key={i} 
+                            onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                             style={{ 
                               marginBottom: isNarrow ? '0.2rem' : '0.25rem',
+                              cursor: 'pointer',
                               padding: isNarrow ? '0.1rem 0.2rem' : '0.125rem 0.25rem',
                               borderRadius: '3px',
                               backgroundColor: isSelected ? '#ffc107' : 'transparent',
+                              fontWeight: isSelected ? '600' : 'normal',
                               transition: 'background-color 0.2s',
                               wordBreak: 'break-word',
                             }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = '#f0f0f0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
                           >
-                            <span 
-                              style={{ fontWeight: '600', cursor: 'pointer' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCategoryClick(e, sel.categoryId);
-                              }}
-                              title="Click to highlight this category across all days"
-                            >
-                              {sel.categoryName}:
-                            </span>{' '}
-                            <span
-                              style={{ cursor: 'pointer' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleValueClick(e, sel.value);
-                              }}
-                              title="Click to highlight this value across all days and categories"
-                            >
-                              {displayValue}{timeDisplay}
-                            </span>
+                            <span style={{ fontWeight: '600' }}>{sel.categoryName}:</span> {displayValue}{timeDisplay}
                           </li>
                         );
                       })}
@@ -624,10 +567,7 @@ export default function Calendar() {
                     {selections.length > 0 && (
                       <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                         {selections.map((sel, i) => {
-                          const isCategorySelected = highlightFilter?.filterBy === 'category' && highlightFilter?.categoryId === sel.categoryId;
-                          const isValueSelected = highlightFilter?.filterBy === 'value' && highlightFilter?.value === sel.value;
-                          const isBothSelected = highlightFilter?.filterBy === 'both' && highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
-                          const isSelected = isCategorySelected || isValueSelected || isBothSelected;
+                          const isSelected = highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
                           const category = categories.find(c => c.id === sel.categoryId);
                           const entry = entries.find(e => e.date === dateStr);
                           const displayValue = category?.isCounter 
@@ -640,35 +580,28 @@ export default function Calendar() {
                           return (
                             <li 
                               key={i} 
+                              onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                               style={{ 
                                 marginBottom: isNarrow ? '0.1rem' : '0.25rem',
+                                cursor: 'pointer',
                                 padding: isNarrow ? '0.05rem 0.15rem' : '0.125rem 0.25rem',
                                 borderRadius: '3px',
                                 backgroundColor: isSelected ? '#ffc107' : 'transparent',
+                                fontWeight: isSelected ? '600' : 'normal',
                                 transition: 'background-color 0.2s',
-                                wordBreak: 'break-word',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.backgroundColor = '#f0f0f0';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }
                               }}
                             >
-                              <span 
-                                style={{ fontWeight: '600', cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCategoryClick(e, sel.categoryId);
-                                }}
-                                title="Click to highlight this category across all days"
-                              >
-                                {sel.categoryName}:
-                              </span>{' '}
-                              <span
-                                style={{ cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleValueClick(e, sel.value);
-                                }}
-                                title="Click to highlight this value across all days and categories"
-                              >
-                                {displayValue}{timeDisplay}
-                              </span>
+                              <span style={{ fontWeight: '600' }}>{sel.categoryName}:</span> {displayValue}{timeDisplay}
                             </li>
                           );
                         })}

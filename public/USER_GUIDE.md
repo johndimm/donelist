@@ -1,4 +1,6 @@
-# User Guide
+# Freedom of Choice - User Guide
+
+**[← Back to Main Application](/)** | **[View Your Data](/view-data)**
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -16,7 +18,9 @@
 
 ## Introduction
 
-This is a daily tracking and journaling application that helps you track activities, habits, and data with as many categories as you want. It's perfect for tracking everything from mood and exercise to productivity metrics and personal goals.
+**[Open Freedom of Choice Application →](/)**
+
+**Freedom of Choice** is a daily tracking and journaling application that helps you track activities, habits, and data across multiple customizable categories. It's perfect for tracking everything from mood and exercise to productivity metrics and personal goals.
 
 ### Key Features
 - **Calendar View**: See your tracked data in week or month view
@@ -33,7 +37,7 @@ This is a daily tracking and journaling application that helps you track activit
 
 ### First Time Use
 
-1. **Open the Application**: Navigate to the Done List app in your browser
+1. **Open the Application**: Navigate to the Freedom of Choice app in your browser
 2. **Create Your First Category**: 
    - Click on any day in the calendar
    - Click the "New" button or "Create First Category"
@@ -93,10 +97,6 @@ Each day shows:
 - **Notes**: Any notes added to the day
 - **Highlighting**: Days matching your filter highlight in yellow
 
-![Calendar View Example](/calendar-example.png)
-
-*Example calendar view showing a week of tracked data. Notice how days with matching selections (like "Gym: bike-swim") are highlighted in yellow, and today's date (Friday the 21st) has a blue border.*
-
 ### Interacting with the Calendar
 
 - **Click a Day**: Opens the day edit page
@@ -119,10 +119,6 @@ Each day shows:
 
 The day edit page is where you enter and manage your daily data.
 
-![Day Edit View Example](/day-edit-example.png)
-
-*Example day edit view showing multiple category cards. Each card displays the category name, checkboxes for settings (visible, time, counter), and a list of values with options to add short names, track time, or use counter mode.*
-
 ### Opening a Day
 
 - Click any day in the calendar view
@@ -134,7 +130,6 @@ The day edit page is where you enter and manage your daily data.
 - Shows the full date (e.g., "Monday, January 15, 2024")
 - "Manage" button: Opens category management panel
 - "New" button: Creates a new category
-- "Close" button: Returns to calendar view
 
 **Notes Section**:
 - Large text area at the top
@@ -321,13 +316,13 @@ Notes allow you to add free-form text to any day.
 
 ## Data Management
 
-Done List stores all data in your browser's localStorage. This means your data stays on your device.
+Freedom of Choice stores all data in your browser's localStorage. This means your data stays on your device.
 
 ### Exporting Data
 
 1. Click the "Export" button in the top right of the calendar view
 2. A JSON file downloads automatically
-3. Filename format: `done-list-export-YYYY-MM-DD.json`
+3. Filename format: `freedom-of-choice-export-YYYY-MM-DD.json`
 4. **Important**: Export regularly to back up your data!
 
 ### Importing Data
@@ -423,7 +418,7 @@ Navigate to `/view-data` to see your data as formatted JSON. Useful for debuggin
 
 **Import Failing**:
 - Ensure the file is valid JSON
-- Check that it was exported from Done List
+- Check that it was exported from Freedom of Choice
 - Verify the file structure matches expected format
 
 ---
@@ -518,7 +513,7 @@ If you encounter issues:
 
 ## Version Information
 
-This user guide is for Done List. The application uses:
+This user guide is for Freedom of Choice. The application uses:
 - Next.js 14
 - React 18
 - TypeScript
@@ -528,7 +523,7 @@ This user guide is for Done List. The application uses:
 
 ## Conclusion
 
-Done List is designed to be simple, flexible, and powerful. Start with a few categories and add more as you discover what works best for your tracking needs. The key is consistency - even a few minutes each day can build valuable insights over time.
+Freedom of Choice is designed to be simple, flexible, and powerful. Start with a few categories and add more as you discover what works best for your tracking needs. The key is consistency - even a few minutes each day can build valuable insights over time.
 
 Happy tracking! 📊✨
 
