@@ -34,13 +34,11 @@ export default function Calendar() {
       const gap = width < 900 ? 8 : 16; // gap in pixels
       const minDayWidth = 200; // minimum day width in pixels
       const availableWidth = width - mainPadding;
-      // Calculate how many days fit: n days need n * minDayWidth + (n-1) * gap
-      // So: n * minDayWidth + (n-1) * gap <= availableWidth
-      // n * minDayWidth + n * gap - gap <= availableWidth
-      // n * (minDayWidth + gap) <= availableWidth + gap
-      // n <= (availableWidth + gap) / (minDayWidth + gap)
-      // But we need to be conservative - subtract 1 to ensure we don't overflow
-      const calculatedDays = Math.floor((availableWidth + gap) / (minDayWidth + gap)) - 1;
+      // Use a more generous calculation since we're using minmax which allows flexibility
+      // The minmax allows days to be slightly smaller if needed
+      // Calculate with a smaller effective width to allow more days to fit
+      const effectiveMinWidth = minDayWidth * 0.90; // Allow 10% smaller for flexibility
+      const calculatedDays = Math.floor((availableWidth + gap) / (effectiveMinWidth + gap));
       // Cap at 7 and ensure at least 1
       const daysThatFit = Math.max(1, Math.min(7, calculatedDays));
       setColumnsPerRow(daysThatFit);
@@ -292,22 +290,9 @@ export default function Calendar() {
     // direction: -1 = previous (newer days), 1 = next (older days)
     setDayOffset(prev => {
       const newOffset = prev - (direction * 7); // Negative direction shows newer days
-      // Calculate maxOffset based on actual data range
-      const earliestDate = entries.length > 0 
-        ? entries.reduce((earliest, entry) => {
-            const entryDate = parseDate(entry.date);
-            return entryDate < earliest ? entryDate : earliest;
-          }, parseDate(entries[0].date))
-        : new Date();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const daysDiff = Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
-      const weeksNeeded = Math.ceil(daysDiff / 7) + 1;
-      const actualWeeksToShow = Math.max(4, Math.min(weeksNeeded, weeksToShow));
-      const maxDaysAvailable = actualWeeksToShow * 7;
-      const maxDaysToShow = 4 * 7; // 4 rows
-      const maxOffset = Math.max(0, maxDaysAvailable - maxDaysToShow);
-      return Math.max(0, Math.min(newOffset, maxOffset));
+      // Ensure offset doesn't go negative
+      // The max offset will be handled by the slice logic in render
+      return Math.max(0, newOffset);
     });
   }
   
@@ -381,8 +366,13 @@ export default function Calendar() {
   // dayOffset determines which days to show (0 = most recent days)
   const maxRows = 4;
   const maxDaysToShow = maxRows * daysPerRow;
-  const startIndex = Math.max(0, allWeekDates.length - maxDaysToShow - dayOffset);
-  const endIndex = startIndex + maxDaysToShow;
+  // Calculate max offset to prevent going past the beginning
+  // Allow navigation even if all days fit - we can scroll through them
+  const maxOffset = Math.max(0, allWeekDates.length - maxDaysToShow);
+  const actualOffset = Math.min(dayOffset, maxOffset);
+  // Start from the end and work backwards, or from a specific offset
+  const startIndex = Math.max(0, allWeekDates.length - maxDaysToShow - actualOffset);
+  const endIndex = Math.min(allWeekDates.length, startIndex + maxDaysToShow);
   const visibleDays = allWeekDates.slice(startIndex, endIndex);
   const firstVisibleDate = visibleDays.length > 0 ? visibleDays[0] : allWeekDates[0];
   const lastVisibleDate = visibleDays.length > 0 ? visibleDays[visibleDays.length - 1] : allWeekDates[allWeekDates.length - 1];
@@ -529,7 +519,7 @@ export default function Calendar() {
             ref={calendarGridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${daysPerRow}, 200px)`,
+              gridTemplateColumns: `repeat(${daysPerRow}, minmax(200px, 1fr))`,
               gap: isNarrow ? '8px' : '16px',
               width: '100%',
               overflowX: 'auto',
