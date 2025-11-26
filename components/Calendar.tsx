@@ -285,13 +285,16 @@ export default function Calendar() {
     router.push(`/day/${formatDate(date)}`);
   }
 
-  function navigateWeek(direction: number) {
+  function navigateWeek(direction: number, currentVisibleDays: number) {
     // Navigate by changing which days are shown
-    // direction: -1 = previous (newer days), 1 = next (older days)
+    // direction: -1 = previous (older days/past), 1 = next (newer days/future)
+    // Move by the number of days actually visible on the current page
     setDayOffset(prev => {
-      const newOffset = prev - (direction * 7); // Negative direction shows newer days
+      // direction 1 (next) = show newer days = decrease offset (move towards end of array)
+      // direction -1 (prev) = show older days = increase offset (move towards start of array)
+      const newOffset = prev - (direction * currentVisibleDays);
+      console.log('Navigate: direction=', direction, 'currentVisibleDays=', currentVisibleDays, 'prev offset=', prev, 'new offset=', newOffset);
       // Ensure offset doesn't go negative
-      // The max offset will be handled by the slice logic in render
       return Math.max(0, newOffset);
     });
   }
@@ -366,19 +369,29 @@ export default function Calendar() {
   // dayOffset determines which days to show (0 = most recent days)
   const maxRows = 4;
   const maxDaysToShow = maxRows * daysPerRow;
-  // Calculate max offset to prevent going past the beginning
-  // Allow navigation even if all days fit - we can scroll through them
-  const maxOffset = Math.max(0, allWeekDates.length - maxDaysToShow);
+  // Find today's index in allWeekDates to ensure we show today
+  const todayStr = formatDate(todayDate);
+  const todayIndexInAllDates = allWeekDates.findIndex(date => formatDate(date) === todayStr);
+  
+  // Calculate start index: always use offset-based calculation, but cap at today to avoid future days
+  // The actual end of data is today (not the end of the week)
+  const dataEndIndex = todayIndexInAllDates >= 0 ? todayIndexInAllDates + 1 : allWeekDates.length;
+  const maxOffset = Math.max(0, dataEndIndex - maxDaysToShow);
   const actualOffset = Math.min(dayOffset, maxOffset);
-  // Start from the end and work backwards, or from a specific offset
-  const startIndex = Math.max(0, allWeekDates.length - maxDaysToShow - actualOffset);
-  const endIndex = Math.min(allWeekDates.length, startIndex + maxDaysToShow);
+  let startIndex = Math.max(0, dataEndIndex - maxDaysToShow - actualOffset);
+  let endIndex = Math.min(dataEndIndex, startIndex + maxDaysToShow);
+  
+  // Ensure we show at least some days if possible
+  if (startIndex >= endIndex && dataEndIndex > 0) {
+    startIndex = Math.max(0, dataEndIndex - maxDaysToShow);
+    endIndex = dataEndIndex;
+  }
+  
   const visibleDays = allWeekDates.slice(startIndex, endIndex);
   const firstVisibleDate = visibleDays.length > 0 ? visibleDays[0] : allWeekDates[0];
   const lastVisibleDate = visibleDays.length > 0 ? visibleDays[visibleDays.length - 1] : allWeekDates[allWeekDates.length - 1];
   
   // Find today's index to scroll to it on mount
-  const todayStr = formatDate(todayDate);
   const todayIndex = visibleDays.findIndex(date => formatDate(date) === todayStr);
   
   // Reset dayOffset when weeksToShow changes to show most recent days
@@ -422,7 +435,7 @@ export default function Calendar() {
             </button>
           )}
           <button
-            onClick={() => viewMode === 'week' ? navigateWeek(-1) : navigateMonth(-1)}
+            onClick={() => viewMode === 'week' ? navigateWeek(-1, visibleDays.length) : navigateMonth(-1)}
             style={{
               padding: isNarrow ? '0.25rem' : '0.5rem',
               borderRadius: '6px',
@@ -451,7 +464,7 @@ export default function Calendar() {
               : monthName}
           </h2>
           <button
-            onClick={() => viewMode === 'week' ? navigateWeek(1) : navigateMonth(1)}
+            onClick={() => viewMode === 'week' ? navigateWeek(1, visibleDays.length) : navigateMonth(1)}
             style={{
               padding: isNarrow ? '0.25rem' : '0.5rem',
               borderRadius: '6px',
