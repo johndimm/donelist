@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { loadData, formatDate, parseDate, getDayEntry } from '@/lib/storage';
@@ -15,25 +15,36 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<DayEntry[]>([]);
-  const [highlightFilter, setHighlightFilter] = useState<{ categoryId: string; value: string | number } | null>(null);
+  const [highlightFilter, setHighlightFilter] = useState<{ categoryId?: string; value?: string | number } | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [columnsPerRow, setColumnsPerRow] = useState(7);
+  const [weeksToShow, setWeeksToShow] = useState(4); // Default: this week + last 3 weeks
+  const [dayOffset, setDayOffset] = useState(0); // Offset to show different 7-day windows
+  const [daysPerRow, setDaysPerRow] = useState(7); // Number of days that fit per row
+  const calendarGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkWidth = () => {
       const width = window.innerWidth;
       setIsNarrow(width < 900);
       
-      // Calculate how many columns can fit: (width - padding - gaps) / (minDayWidth + gap)
+      // Calculate how many days can fit per row: use all available width
       // Account for main padding (2rem = 32px on each side = 64px total, or 0.5rem = 8px on narrow)
       const mainPadding = width < 900 ? 16 : 64;
       const gap = width < 900 ? 8 : 16; // gap in pixels
-      const minDayWidth = 140; // minimum day width in pixels
+      const minDayWidth = 200; // minimum day width in pixels
       const availableWidth = width - mainPadding;
-      // Calculate: (availableWidth + gap) / (minDayWidth + gap)
-      const calculatedColumns = Math.floor((availableWidth + gap) / (minDayWidth + gap));
+      // Calculate how many days fit: n days need n * minDayWidth + (n-1) * gap
+      // So: n * minDayWidth + (n-1) * gap <= availableWidth
+      // n * minDayWidth + n * gap - gap <= availableWidth
+      // n * (minDayWidth + gap) <= availableWidth + gap
+      // n <= (availableWidth + gap) / (minDayWidth + gap)
+      // But we need to be conservative - subtract 1 to ensure we don't overflow
+      const calculatedDays = Math.floor((availableWidth + gap) / (minDayWidth + gap)) - 1;
       // Cap at 7 and ensure at least 1
-      setColumnsPerRow(Math.max(1, Math.min(7, calculatedColumns)));
+      const daysThatFit = Math.max(1, Math.min(7, calculatedDays));
+      setColumnsPerRow(daysThatFit);
+      setDaysPerRow(daysThatFit);
     };
     checkWidth();
     window.addEventListener('resize', checkWidth);
@@ -60,28 +71,27 @@ export default function Calendar() {
     setEntries(data.entries);
   }
 
-  function getWeekDates(date: Date): Date[] {
+  function getWeekDates(date: Date, numWeeks: number = 4): Date[] {
     const dateCopy = new Date(date);
     const day = dateCopy.getDay();
     const diff = dateCopy.getDate() - day;
     const startOfThisWeek = new Date(dateCopy);
     startOfThisWeek.setDate(diff);
-    const startOfLastWeek = new Date(startOfThisWeek);
-    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+    
     const dates: Date[] = [];
-    // Add last week (7 days)
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfLastWeek);
-      d.setDate(startOfLastWeek.getDate() + i);
-      dates.push(d);
+    // Generate weeks going backwards from this week
+    // Start from the oldest week and work forward to this week
+    for (let week = numWeeks - 1; week >= 0; week--) {
+      const weekStart = new Date(startOfThisWeek);
+      weekStart.setDate(startOfThisWeek.getDate() - (week * 7));
+      // Add 7 days for this week
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        dates.push(d);
+      }
     }
-    // Add this week (7 days)
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfThisWeek);
-      d.setDate(startOfThisWeek.getDate() + i);
-      dates.push(d);
-    }
-    return dates;
+    return dates; // Oldest days first, newest (this week) at the end
   }
 
   function getMonthDates(date: Date): Date[] {
@@ -172,17 +182,84 @@ export default function Calendar() {
     const entry = entries.find(e => e.date === dateStr);
     if (!entry) return false;
     
-    const selection = entry.selections[highlightFilter.categoryId];
-    if (!selection) return false;
-    
-    if (typeof highlightFilter.value === 'number') {
-      return typeof selection === 'number' && selection === highlightFilter.value;
-    } else {
-      const value = getSelectionValue(selection);
-      return value === highlightFilter.value;
+    // If highlighting by category only (any value)
+    if (highlightFilter.categoryId && highlightFilter.value === undefined) {
+      return entry.selections.hasOwnProperty(highlightFilter.categoryId);
     }
+    
+    // If highlighting by value only (any category)
+    if (highlightFilter.value !== undefined && !highlightFilter.categoryId) {
+      return Object.values(entry.selections).some(selection => {
+        if (typeof highlightFilter.value === 'number') {
+          return typeof selection === 'number' && selection === highlightFilter.value;
+        } else {
+          const value = getSelectionValue(selection);
+          return value === highlightFilter.value;
+        }
+      });
+    }
+    
+    // If highlighting by both category and value (original behavior)
+    if (highlightFilter.categoryId && highlightFilter.value !== undefined) {
+      const selection = entry.selections[highlightFilter.categoryId];
+      if (!selection) return false;
+      
+      if (typeof highlightFilter.value === 'number') {
+        return typeof selection === 'number' && selection === highlightFilter.value;
+      } else {
+        const value = getSelectionValue(selection);
+        return value === highlightFilter.value;
+      }
+    }
+    
+    return false;
+  }
+  
+  function isSelectionLineHighlighted(categoryId: string, value: string | number): boolean {
+    if (!highlightFilter) return false;
+    
+    // If highlighting by category only
+    if (highlightFilter.categoryId && highlightFilter.value === undefined) {
+      return categoryId === highlightFilter.categoryId;
+    }
+    
+    // If highlighting by value only
+    if (highlightFilter.value !== undefined && !highlightFilter.categoryId) {
+      if (typeof highlightFilter.value === 'number') {
+        return typeof value === 'number' && value === highlightFilter.value;
+      } else {
+        return value === highlightFilter.value;
+      }
+    }
+    
+    // If highlighting by both
+    if (highlightFilter.categoryId && highlightFilter.value !== undefined) {
+      return categoryId === highlightFilter.categoryId && value === highlightFilter.value;
+    }
+    
+    return false;
   }
 
+  function handleCategoryClick(e: React.MouseEvent, categoryId: string) {
+    e.stopPropagation(); // Prevent day click
+    if (highlightFilter && highlightFilter.categoryId === categoryId && highlightFilter.value === undefined) {
+      // Clicking the same category again clears the highlight
+      setHighlightFilter(null);
+    } else {
+      setHighlightFilter({ categoryId });
+    }
+  }
+  
+  function handleValueClick(e: React.MouseEvent, value: string | number) {
+    e.stopPropagation(); // Prevent day click
+    if (highlightFilter && !highlightFilter.categoryId && highlightFilter.value === value) {
+      // Clicking the same value again clears the highlight
+      setHighlightFilter(null);
+    } else {
+      setHighlightFilter({ value });
+    }
+  }
+  
   function handleSelectionClick(e: React.MouseEvent, categoryId: string, value: string | number) {
     e.stopPropagation(); // Prevent day click
     if (highlightFilter && highlightFilter.categoryId === categoryId && highlightFilter.value === value) {
@@ -211,9 +288,31 @@ export default function Calendar() {
   }
 
   function navigateWeek(direction: number) {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (direction * 14)); // Move by 2 weeks (fortnight)
-    setCurrentDate(newDate);
+    // Navigate by changing which days are shown
+    // direction: -1 = previous (newer days), 1 = next (older days)
+    setDayOffset(prev => {
+      const newOffset = prev - (direction * 7); // Negative direction shows newer days
+      // Calculate maxOffset based on actual data range
+      const earliestDate = entries.length > 0 
+        ? entries.reduce((earliest, entry) => {
+            const entryDate = parseDate(entry.date);
+            return entryDate < earliest ? entryDate : earliest;
+          }, parseDate(entries[0].date))
+        : new Date();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysDiff = Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+      const weeksNeeded = Math.ceil(daysDiff / 7) + 1;
+      const actualWeeksToShow = Math.max(4, Math.min(weeksNeeded, weeksToShow));
+      const maxDaysAvailable = actualWeeksToShow * 7;
+      const maxDaysToShow = 4 * 7; // 4 rows
+      const maxOffset = Math.max(0, maxDaysAvailable - maxDaysToShow);
+      return Math.max(0, Math.min(newOffset, maxOffset));
+    });
+  }
+  
+  function loadMoreWeeks() {
+    setWeeksToShow(prev => prev + 4); // Load 4 more weeks
   }
 
   function navigateMonth(direction: number) {
@@ -231,7 +330,7 @@ export default function Calendar() {
     const todayStr = formatDate(today);
     
     if (viewMode === 'week') {
-      const weekDates = getWeekDates(new Date(currentDate));
+      const weekDates = getWeekDates(new Date(), weeksToShow);
       return weekDates.some(date => formatDate(date) === todayStr);
     } else {
       const monthDates = getMonthDates(new Date(currentDate));
@@ -242,12 +341,62 @@ export default function Calendar() {
     }
   }
 
-  if (!mounted) return null;
+  // Find the earliest date with data
+  const earliestDate = entries.length > 0 
+    ? entries.reduce((earliest, entry) => {
+        const entryDate = parseDate(entry.date);
+        return entryDate < earliest ? entryDate : earliest;
+      }, parseDate(entries[0].date))
+    : new Date();
 
-  const weekDates = getWeekDates(new Date(currentDate));
+  // Get today's date
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+
+  // Generate dates from earliest date to today
+  const allWeekDates: Date[] = [];
+  const startDate = new Date(earliestDate);
+  // Start from the beginning of the week containing the earliest date
+  const dayOfWeek = startDate.getDay();
+  startDate.setDate(startDate.getDate() - dayOfWeek);
+  
+  // End at the end of this week
+  const endDate = new Date(todayDate);
+  const endDayOfWeek = endDate.getDay();
+  endDate.setDate(endDate.getDate() + (6 - endDayOfWeek)); // End of this week
+  
+  const dateIterator = new Date(startDate);
+  while (dateIterator <= endDate) {
+    allWeekDates.push(new Date(dateIterator));
+    dateIterator.setDate(dateIterator.getDate() + 1);
+  }
+
   const monthDates = getMonthDates(new Date(currentDate));
   const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const todayVisible = isTodayVisible();
+  
+  // Use the calculated daysPerRow from state (updated on window resize)
+  
+  // Show up to 4 rows (lines) of days
+  // dayOffset determines which days to show (0 = most recent days)
+  const maxRows = 4;
+  const maxDaysToShow = maxRows * daysPerRow;
+  const startIndex = Math.max(0, allWeekDates.length - maxDaysToShow - dayOffset);
+  const endIndex = startIndex + maxDaysToShow;
+  const visibleDays = allWeekDates.slice(startIndex, endIndex);
+  const firstVisibleDate = visibleDays.length > 0 ? visibleDays[0] : allWeekDates[0];
+  const lastVisibleDate = visibleDays.length > 0 ? visibleDays[visibleDays.length - 1] : allWeekDates[allWeekDates.length - 1];
+  
+  // Find today's index to scroll to it on mount
+  const todayStr = formatDate(todayDate);
+  const todayIndex = visibleDays.findIndex(date => formatDate(date) === todayStr);
+  
+  // Reset dayOffset when weeksToShow changes to show most recent days
+  useEffect(() => {
+    setDayOffset(0);
+  }, [weeksToShow]);
+
+  if (!mounted) return null;
 
   return (
     <div>
@@ -308,7 +457,7 @@ export default function Calendar() {
           </button>
           <h2 style={{ fontSize: isNarrow ? '1rem' : '1.5rem', fontWeight: '600', minWidth: isNarrow ? '120px' : '200px', margin: 0 }}>
             {viewMode === 'week' 
-              ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[13].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+              ? `${firstVisibleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${lastVisibleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
               : monthName}
           </h2>
           <button
@@ -375,12 +524,17 @@ export default function Calendar() {
       </div>
 
       {viewMode === 'week' ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${columnsPerRow}, 1fr)`,
-          gap: isNarrow ? '0.5rem' : '1rem',
-        }}>
-          {weekDates.map((date, idx) => {
+        <>
+          <div 
+            ref={calendarGridRef}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${daysPerRow}, 200px)`,
+              gap: isNarrow ? '8px' : '16px',
+              width: '100%',
+              overflowX: 'auto',
+            }}>
+            {visibleDays.map((date, idx) => {
             const dateStr = formatDate(date);
             const isToday = dateStr === formatDate(new Date());
             const selections = getDaySelections(date);
@@ -397,8 +551,8 @@ export default function Calendar() {
                   padding: isNarrow ? '0.5rem' : '1rem',
                   border: isToday ? '2px solid #0070f3' : isHighlighted ? '2px solid #ffc107' : '1px solid #ddd',
                   cursor: 'pointer',
-                  minWidth: '140px',
-                  maxWidth: '100%',
+                  minWidth: '200px',
+                  width: '100%',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                 }}
                 onMouseEnter={(e) => {
@@ -422,7 +576,7 @@ export default function Calendar() {
                   {selections.length > 0 && (
                     <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                       {selections.map((sel, i) => {
-                        const isSelected = highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
+                        const isLineHighlighted = isSelectionLineHighlighted(sel.categoryId, sel.value);
                         const category = categories.find(c => c.id === sel.categoryId);
                         const entry = entries.find(e => e.date === dateStr);
                         const displayValue = category?.isCounter 
@@ -435,29 +589,57 @@ export default function Calendar() {
                         return (
                           <li 
                             key={i} 
-                            onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                             style={{ 
                               marginBottom: isNarrow ? '0.2rem' : '0.25rem',
-                              cursor: 'pointer',
                               padding: isNarrow ? '0.1rem 0.2rem' : '0.125rem 0.25rem',
                               borderRadius: '3px',
-                              backgroundColor: isSelected ? '#ffc107' : 'transparent',
-                              fontWeight: isSelected ? '600' : 'normal',
+                              backgroundColor: isLineHighlighted ? '#ffc107' : 'transparent',
                               transition: 'background-color 0.2s',
-                              wordBreak: 'break-word',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = '#f0f0f0';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
+                              display: 'flex',
+                              flexWrap: 'nowrap',
+                              alignItems: 'baseline',
+                              minWidth: 0,
                             }}
                           >
-                            <span style={{ fontWeight: '600' }}>{sel.categoryName}:</span> {displayValue}{timeDisplay}
+                            <span 
+                              onClick={(e) => handleCategoryClick(e, sel.categoryId)}
+                              style={{ 
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                padding: '0.125rem 0.25rem',
+                                borderRadius: '3px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#e0e0e0';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              {sel.categoryName}:
+                            </span>
+                            <span
+                              onClick={(e) => handleValueClick(e, sel.value)}
+                              style={{
+                                cursor: 'pointer',
+                                padding: '0.125rem 0.25rem',
+                                borderRadius: '3px',
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                flexShrink: 1,
+                                minWidth: 0,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#e0e0e0';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              {displayValue}{timeDisplay}
+                            </span>
                           </li>
                         );
                       })}
@@ -480,8 +662,32 @@ export default function Calendar() {
                 </div>
               </div>
             );
-          })}
-        </div>
+            })}
+          </div>
+          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <button
+              onClick={loadMoreWeeks}
+              style={{
+                padding: isNarrow ? '0.5rem 1rem' : '0.75rem 1.5rem',
+                borderRadius: '6px',
+                backgroundColor: '#0070f3',
+                color: 'white',
+                border: '1px solid #0070f3',
+                fontSize: isNarrow ? '0.85rem' : '1rem',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0051cc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0070f3';
+              }}
+            >
+              More
+            </button>
+          </div>
+        </>
       ) : (
         <div>
           <div style={{
@@ -567,7 +773,7 @@ export default function Calendar() {
                     {selections.length > 0 && (
                       <ul style={{ listStyle: 'none', padding: 0, marginBottom: notes ? '0.5rem' : 0 }}>
                         {selections.map((sel, i) => {
-                          const isSelected = highlightFilter?.categoryId === sel.categoryId && highlightFilter?.value === sel.value;
+                          const isLineHighlighted = isSelectionLineHighlighted(sel.categoryId, sel.value);
                           const category = categories.find(c => c.id === sel.categoryId);
                           const entry = entries.find(e => e.date === dateStr);
                           const displayValue = category?.isCounter 
@@ -580,28 +786,48 @@ export default function Calendar() {
                           return (
                             <li 
                               key={i} 
-                              onClick={(e) => handleSelectionClick(e, sel.categoryId, sel.value)}
                               style={{ 
                                 marginBottom: isNarrow ? '0.1rem' : '0.25rem',
-                                cursor: 'pointer',
                                 padding: isNarrow ? '0.05rem 0.15rem' : '0.125rem 0.25rem',
                                 borderRadius: '3px',
-                                backgroundColor: isSelected ? '#ffc107' : 'transparent',
-                                fontWeight: isSelected ? '600' : 'normal',
+                                backgroundColor: isLineHighlighted ? '#ffc107' : 'transparent',
                                 transition: 'background-color 0.2s',
                               }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.backgroundColor = '#f0f0f0';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                              }}
                             >
-                              <span style={{ fontWeight: '600' }}>{sel.categoryName}:</span> {displayValue}{timeDisplay}
+                              <span 
+                                onClick={(e) => handleCategoryClick(e, sel.categoryId)}
+                                style={{ 
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  padding: '0.05rem 0.15rem',
+                                  borderRadius: '3px',
+                                  marginRight: '0.25rem',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#e0e0e0';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {sel.categoryName}:
+                              </span>
+                              <span
+                                onClick={(e) => handleValueClick(e, sel.value)}
+                                style={{
+                                  cursor: 'pointer',
+                                  padding: '0.05rem 0.15rem',
+                                  borderRadius: '3px',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#e0e0e0';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {displayValue}{timeDisplay}
+                              </span>
                             </li>
                           );
                         })}

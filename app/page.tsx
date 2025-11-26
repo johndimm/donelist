@@ -32,7 +32,7 @@ function HomeContent() {
 
   return (
     <>
-      <main style={{ padding: isNarrow ? '0.5rem' : '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <main style={{ padding: isNarrow ? '0.5rem' : '2rem', maxWidth: '100%', width: '100%', margin: '0 auto' }}>
         <Calendar />
       </main>
       {showOverlay && (
