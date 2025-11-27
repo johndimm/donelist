@@ -140,6 +140,12 @@ export default function Calendar() {
     const entry = entries.find(e => e.date === dateStr);
     if (!entry) return [];
 
+    // Create a map of category ID to index for sorting
+    const categoryIndexMap = new Map<string, number>();
+    categories.forEach((cat, index) => {
+      categoryIndexMap.set(cat.id, index);
+    });
+
     const selections: SelectionDisplay[] = [];
     Object.entries(entry.selections).forEach(([categoryId, selection]) => {
       const category = categories.find(c => c.id === categoryId);
@@ -171,6 +177,14 @@ export default function Calendar() {
         displayText: `${category.name}: ${displayValue}${timeDisplay}`,
       });
     });
+    
+    // Sort selections by the order they appear in the categories array
+    selections.sort((a, b) => {
+      const indexA = categoryIndexMap.get(a.categoryId) ?? Infinity;
+      const indexB = categoryIndexMap.get(b.categoryId) ?? Infinity;
+      return indexA - indexB;
+    });
+    
     return selections;
   }
 
