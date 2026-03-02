@@ -11,7 +11,13 @@ type ViewMode = 'week' | 'month';
 export default function Calendar() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('donelist-view-mode');
+      if (saved === 'week' || saved === 'month') return saved;
+    }
+    return 'week';
+  });
   const [currentDate, setCurrentDate] = useState(new Date());
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<DayEntry[]>([]);
@@ -504,7 +510,11 @@ export default function Calendar() {
         </div>
         {columnsPerRow >= 7 && (
           <button
-            onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
+            onClick={() => {
+            const next: ViewMode = viewMode === 'week' ? 'month' : 'week';
+            setViewMode(next);
+            localStorage.setItem('donelist-view-mode', next);
+          }}
             style={{
               padding: isNarrow ? '0.35rem 0.6rem' : '0.5rem 1rem',
               borderRadius: '6px',
